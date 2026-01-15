@@ -17,10 +17,11 @@ const focacciaGrid = document.getElementById('focaccia-grid')
 const salsasBubbles = document.getElementById('salsas-bubbles')
 const otherGrid = document.getElementById('other-grid')
 const rateTicker = document.getElementById('rate-ticker')
-const cartCount = document.getElementById('cart-count')
+const cartCount = document.getElementById('floating-cart-count')
+const cartTotal = document.getElementById('floating-cart-total')
 
 const cartModal = document.getElementById('cart-modal')
-const cartTrigger = document.getElementById('cart-trigger')
+const cartTrigger = document.getElementById('floating-cart-btn')
 
 async function init() {
   // 1. Fetch Data
@@ -40,6 +41,7 @@ async function init() {
 
     // 3. Render Menu
     renderMenu()
+    updateCartUI()
   } catch (error) {
     console.error('Initialization failed:', error)
     showToast('Error al cargar datos. Revisa la consola.', 'error')
@@ -212,12 +214,22 @@ function createFocacciaCard(product, priceBs, index) {
 
   const imgUrl = product.image_url || 'https://images.unsplash.com/photo-1599321955419-7853b2a9746b?auto=format&fit=crop&q=80&w=800'
 
+  let descriptionHTML = ''
+  if (product.description && product.description.trim().length > 0) {
+    descriptionHTML = '<div class="card-description-wrapper"><p class="card-description">' + product.description + '</p></div>'
+  }
+
   div.innerHTML = `
-    <img src="${imgUrl}" alt="${product.name}" class="card-image">
-    <div class="card-overlay">
+    <div class="card-image-container">
+      <img src="${imgUrl}" alt="${product.name}" class="card-image">
       ${isOutOfStock ? '<div class="stock-badge">Agotado</div>' : ''}
+    </div>
+    <div class="card-content">
       <h4 class="card-title">${product.name}</h4>
       <div class="card-price">$${(product.price || 0).toFixed(2)} | Bs. ${priceBs}</div>
+    </div>
+    ${descriptionHTML}
+    <div class="card-actions">
       <button class="add-btn" onclick="addToCart('${product.id}')" ${isOutOfStock ? 'disabled' : ''}>
         ${isOutOfStock ? 'No disponible' : 'Agregar al Pedido'}
       </button>
@@ -245,20 +257,18 @@ function createBubble(product, priceBs) {
 function createSimpleCard(product, priceBs) {
   const div = document.createElement('div')
   const isOutOfStock = (product.stock_disponible || 0) <= 0
-  div.className = 'glass simple-card'
-  div.style.padding = '1rem'
-  div.style.opacity = isOutOfStock ? '0.6' : '1'
+  div.className = 'simple-card'
+  if (isOutOfStock) div.style.opacity = '0.6'
 
   div.innerHTML = `
     <div>
-      <h4 style="margin: 0">${product.name}</h4>
+      <h4>${product.name}</h4>
       <small style="color: var(--text-muted)">
         $${(product.price || 0).toFixed(2)} | Bs. ${priceBs}
         ${isOutOfStock ? '<br><b style="color:#ff4d4d">Agotado</b>' : ''}
       </small>
     </div>
     <button class="add-btn" 
-            style="padding: 0.5rem 1rem; font-size: 0.8rem; ${isOutOfStock ? 'background:#444; cursor:not-allowed;' : ''}" 
             onclick="addToCart('${product.id}')"
             ${isOutOfStock ? 'disabled' : ''}>
       ${isOutOfStock ? '✕' : '+'}
@@ -305,9 +315,26 @@ function updateCartUI() {
   const totalItems = state.cart.reduce((sum, item) => sum + item.quantity, 0)
   if (cartCount) {
     cartCount.innerText = totalItems
-    // Flash animation
+    cartCount.style.display = totalItems > 0 ? 'block' : 'none'
+
+    // Update Total in floating button
+    if (cartTotal) {
+      const totalUSD = state.cart.reduce((sum, item) => sum + ((item.price || 0) * item.quantity), 0)
+      cartTotal.innerText = `$${totalUSD.toFixed(2)}`
+    }
+
+    // Flash animation on the badge
     cartCount.style.transform = 'scale(1.5)'
     setTimeout(() => cartCount.style.transform = 'scale(1)', 200)
+
+    // Flash animation on the button itself
+    if (cartTrigger) {
+      cartTrigger.classList.remove('empty')
+      if (totalItems === 0) cartTrigger.classList.add('empty')
+
+      cartTrigger.style.transform = 'scale(1.05)'
+      setTimeout(() => cartTrigger.style.transform = 'scale(1)', 200)
+    }
   }
 }
 
