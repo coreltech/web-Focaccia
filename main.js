@@ -1,4 +1,11 @@
 import { getProducts, getExchangeRate, registerOrderV3 } from './src/supabase.js'
+import { CACHE_CONFIG, TOAST_DURATION, ANIMATION_DURATION, WHATSAPP_NUMBER, DEFAULT_IMAGES } from './src/constants.js'
+import { formatPrice, formatExchangeRate } from './src/utils/formatters.js'
+import { validateCheckoutForm, validateCart } from './src/utils/validators.js'
+
+// Cache configuration
+const CACHE_KEY = CACHE_CONFIG.KEY
+const CACHE_TTL = CACHE_CONFIG.TTL
 
 let state = {
   products: [],
@@ -24,8 +31,15 @@ const cartModal = document.getElementById('cart-modal')
 const cartTrigger = document.getElementById('floating-cart-btn')
 
 async function init() {
-  // 1. Fetch Data
   try {
+    // Try to load from cache first for instant render
+    const cached = getCachedProducts()
+    if (cached) {
+      state.products = cached
+      renderMenu() // Render immediately with cached data
+    }
+
+    // Fetch fresh data in parallel
     const [products, rateData] = await Promise.all([
       getProducts(),
       getExchangeRate()
@@ -34,17 +48,46 @@ async function init() {
     state.products = products
     state.exchangeRate = rateData?.rate || 1
 
-    // 2. Update Ticker
+    // Update cache with fresh data
+    setCachedProducts(products)
+
+    // Update UI with fresh data
     if (rateTicker) {
-      rateTicker.innerText = `Bs. ${state.exchangeRate.toFixed(2)}/USD`
+      rateTicker.innerText = formatExchangeRate(state.exchangeRate)
     }
 
-    // 3. Render Menu
+    // Re-render with fresh data
     renderMenu()
     updateCartUI()
   } catch (error) {
     console.error('Initialization failed:', error)
     showToast('Error al cargar datos. Revisa la consola.', 'error')
+  }
+}
+
+function getCachedProducts() {
+  try {
+    const cached = localStorage.getItem(CACHE_KEY)
+    if (!cached) return null
+
+    const { data, timestamp } = JSON.parse(cached)
+    if (Date.now() - timestamp < CACHE_TTL) {
+      return data
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+function setCachedProducts(products) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      data: products,
+      timestamp: Date.now()
+    }))
+  } catch (e) {
+    console.warn('Cache failed:', e)
   }
 }
 
@@ -69,7 +112,7 @@ function showToast(message, type = 'info', duration = 5000) {
 
   setTimeout(() => {
     toast.classList.add('removing')
-    setTimeout(() => toast.remove(), 300)
+    setTimeout(() => toast.remove(), ANIMATION_DURATION.TOAST_REMOVE)
   }, duration)
 }
 
@@ -99,12 +142,24 @@ function renderCartModal() {
           <small style="color: var(--text-muted)">$${(item.price || 0).toFixed(2)}</small>
         </div>
         <div class="qty-controls">
-          <button class="qty-btn" onclick="changeQuantity('${item.id}', -1)">-</button>
-          <span class="qty-val">${item.quantity}</span>
-          <button class="qty-btn" onclick="changeQuantity('${item.id}', 1)">+</button>
+          <button class="qty-btn" 
+                  onclick="changeQuantity('${item.id}', -1)"
+                  aria-label="Disminuir cantidad de ${item.name}">
+            -
+          </button>
+          <span class="qty-val" aria-label="Cantidad">${item.quantity}</span>
+          <button class="qty-btn" 
+                  onclick="changeQuantity('${item.id}', 1)"
+                  aria-label="Aumentar cantidad de ${item.name}">
+            +
+          </button>
         </div>
         <div style="font-weight: 700; min-width: 60px; text-align: right">$${subtotal.toFixed(2)}</div>
-        <button class="remove-item" onclick="removeFromCart('${item.id}')">✕</button>
+        <button class="remove-item" 
+                onclick="removeFromCart('${item.id}')"
+                aria-label="Eliminar ${item.name} del carrito">
+          ✕
+        </button>
       </div>
     `
   })
@@ -191,7 +246,7 @@ function renderMenu() {
   otherGrid.innerHTML = ''
 
   state.products.forEach((product, index) => {
-    const priceBs = ((product.price || 0) * state.exchangeRate).toLocaleString('es-VE', { minimumFractionDigits: 2 })
+    const { ves: priceBs } = formatPrice(product.price || 0, state.exchangeRate)
 
     if (product.category === 'Focaccias') {
       const card = createFocacciaCard(product, priceBs, index)
@@ -212,7 +267,7 @@ function createFocacciaCard(product, priceBs, index) {
   div.className = `focaccia-card ${isOutOfStock ? 'out-of-stock' : ''}`
   div.style.animationDelay = `${index * 0.1}s`
 
-  const imgUrl = product.image_url || 'https://images.unsplash.com/photo-1599321955419-7853b2a9746b?auto=format&fit=crop&q=80&w=800'
+  const imgUrl = product.image_url || DEFAULT_IMAGES.FOCACCIA
 
   let descriptionHTML = ''
   if (product.description && product.description.trim().length > 0) {
@@ -221,7 +276,7 @@ function createFocacciaCard(product, priceBs, index) {
 
   div.innerHTML = `
     <div class="card-image-container">
-      <img src="${imgUrl}" alt="${product.name}" class="card-image">
+      <img src="${imgUrl}" alt="${product.name}" class="card-image" loading="lazy">
       ${isOutOfStock ? '<div class="stock-badge">Agotado</div>' : ''}
     </div>
     <div class="card-content">
@@ -242,11 +297,11 @@ function createBubble(product, priceBs) {
   const div = document.createElement('div')
   div.className = 'bubble'
 
-  const imgUrl = product.image_url || 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&q=80&w=200'
+  const imgUrl = product.image_url || DEFAULT_IMAGES.SALSA
 
   div.innerHTML = `
     <div class="bubble-img-wrapper" onclick="addToCart('${product.id}')">
-      <img src="${imgUrl}" alt="${product.name}" class="bubble-img">
+      <img src="${imgUrl}" alt="${product.name}" class="bubble-img" loading="lazy">
     </div>
     <div class="bubble-name">${product.name}</div>
     <div class="bubble-price">$${(product.price || 0).toFixed(2)}</div>
@@ -257,20 +312,61 @@ function createBubble(product, priceBs) {
 function createSimpleCard(product, priceBs) {
   const div = document.createElement('div')
   const isOutOfStock = (product.stock_disponible || 0) <= 0
-  div.className = 'simple-card'
-  if (isOutOfStock) div.style.opacity = '0.6'
+  div.className = 'beverage-card'
+  if (isOutOfStock) div.classList.add('out-of-stock')
+
+  // Use icon from database if available, otherwise auto-detect
+  let icon = product.icon || null
+
+  // Fallback: Auto-detect icon if not set in database
+  if (!icon) {
+    const iconMap = {
+      'cocacola': '🥤',
+      'coca cola': '🥤',
+      'coca-cola': '🥤',
+      'pepsi': '🥤',
+      'refresco': '🥤',
+      'soda': '🥤',
+      'gaseosa': '🥤',
+      'agua': '💧',
+      'water': '💧',
+      'jugo': '🧃',
+      'juice': '🧃',
+      'té': '🍵',
+      'tea': '🍵',
+      'café': '☕',
+      'coffee': '☕',
+      'espresso': '☕',
+      'cappuccino': '☕',
+      'latte': '☕'
+    }
+
+    // Find matching icon
+    icon = '☕' // default
+    const productName = product.name.toLowerCase()
+    for (const [key, value] of Object.entries(iconMap)) {
+      if (productName.includes(key)) {
+        icon = value
+        break
+      }
+    }
+  }
 
   div.innerHTML = `
-    <div>
-      <h4>${product.name}</h4>
-      <small style="color: var(--text-muted)">
-        $${(product.price || 0).toFixed(2)} | Bs. ${priceBs}
-        ${isOutOfStock ? '<br><b style="color:#ff4d4d">Agotado</b>' : ''}
-      </small>
+    <div class="beverage-icon">${icon}</div>
+    <div class="beverage-info">
+      <h4 class="beverage-name">${product.name}</h4>
+      <div class="beverage-prices">
+        <span class="price-usd">$${(product.price || 0).toFixed(2)}</span>
+        <span class="price-divider">•</span>
+        <span class="price-ves">Bs. ${priceBs}</span>
+      </div>
+      ${isOutOfStock ? '<span class="out-badge">Agotado</span>' : ''}
     </div>
-    <button class="add-btn" 
+    <button class="beverage-add-btn" 
             onclick="addToCart('${product.id}')"
-            ${isOutOfStock ? 'disabled' : ''}>
+            ${isOutOfStock ? 'disabled' : ''}
+            aria-label="Agregar ${product.name} al carrito">
       ${isOutOfStock ? '✕' : '+'}
     </button>
   `
@@ -281,6 +377,13 @@ window.addToCart = (productId) => {
   const product = state.products.find(p => p.id === productId)
   if (!product) return
 
+  // Visual feedback animation
+  const clickedButton = event?.target?.closest('.add-btn')
+  if (clickedButton) {
+    clickedButton.classList.add('adding')
+    setTimeout(() => clickedButton.classList.remove('adding'), 300)
+  }
+
   const existing = state.cart.find(item => item.id === productId)
   if (existing) {
     existing.quantity++
@@ -289,7 +392,7 @@ window.addToCart = (productId) => {
   }
 
   updateCartUI()
-  showToast(`Agregado: ${product.name}`, 'success', 2000)
+  showToast(`Agregado: ${product.name}`, 'success', TOAST_DURATION.SHORT)
 }
 
 window.changeQuantity = (productId, delta) => {
@@ -325,7 +428,7 @@ function updateCartUI() {
 
     // Flash animation on the badge
     cartCount.style.transform = 'scale(1.5)'
-    setTimeout(() => cartCount.style.transform = 'scale(1)', 200)
+    setTimeout(() => cartCount.style.transform = 'scale(1)', ANIMATION_DURATION.BADGE_PULSE)
 
     // Flash animation on the button itself
     if (cartTrigger) {
@@ -333,22 +436,29 @@ function updateCartUI() {
       if (totalItems === 0) cartTrigger.classList.add('empty')
 
       cartTrigger.style.transform = 'scale(1.05)'
-      setTimeout(() => cartTrigger.style.transform = 'scale(1)', 200)
+      setTimeout(() => cartTrigger.style.transform = 'scale(1)', ANIMATION_DURATION.CART_SCALE)
     }
   }
 }
 
 // Exported Checkout for WhatsApp
 window.checkout = async () => {
-  if (state.cart.length === 0) return showToast('El carrito está vacío', 'warning')
+  // Validate cart
+  const cartValidation = validateCart(state.cart)
+  if (!cartValidation.valid) {
+    return showToast(cartValidation.error, 'warning')
+  }
 
   const clientName = document.getElementById('cust-name').value.trim()
   const paymentMethod = document.getElementById('cust-payment').value
   const orderType = state.orderType || 'pickup'
   const address = document.getElementById('cust-address')?.value.trim() || ''
 
-  if (!clientName) return showToast('Por favor, indica tu nombre para el pedido.', 'warning')
-  if (orderType === 'delivery' && !address) return showToast('Por favor, indica la dirección de entrega.', 'warning')
+  // Validate form
+  const formValidation = validateCheckoutForm({ clientName, orderType, address })
+  if (!formValidation.valid) {
+    return showToast(formValidation.errors[0], 'warning')
+  }
 
   const btn = document.getElementById('checkout-btn')
   if (btn) {
@@ -402,7 +512,7 @@ window.checkout = async () => {
     message += `\n\n¿Podrían confirmar disponibilidad para proceder?`
 
     const encoded = encodeURIComponent(message)
-    window.open(`https://wa.me/584145828186?text=${encoded}`, '_blank')
+    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encoded}`, '_blank')
 
     // 3. Clear Cart
     state.cart = []
@@ -426,5 +536,12 @@ window.checkout = async () => {
     }
   }
 }
+
+// Keyboard support for modal
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && cartModal?.classList.contains('active')) {
+    closeModal()
+  }
+})
 
 init()

@@ -119,7 +119,7 @@ npm run preview
 ## 🌐 URLs
 
 - **Desarrollo**: `http://localhost:5173`
-- **Producción**: `https://focaccia-web.vercel.app` (o tu dominio personalizado)
+- **Producción**: `https://web-focaccia.vercel.app` (o tu dominio personalizado)
 
 ---
 

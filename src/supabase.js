@@ -6,38 +6,60 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export async function getProducts() {
-    const { data, error } = await supabase
-        .from('sales_prices')
-        .select('*')
-        .eq('esta_activo', true) // Only active products
-        .order('categoria', { ascending: true })
+    try {
+        const { data, error } = await supabase
+            .from('sales_prices')
+            .select('*')
+            .eq('esta_activo', true) // Only active products
+            .order('categoria', { ascending: true })
 
-    if (error) {
+        if (error) throw error
+
+        // Map database columns to application properties
+        return data.map(p => ({
+            ...p,
+            category: p.categoria,
+            name: p.product_name || 'Sin nombre',
+            price: p.precio_venta_final || 0
+        }))
+    } catch (error) {
         console.error('Error fetching products:', error)
-        return []
+
+        // Specific error handling
+        if (error.code === 'PGRST116') {
+            throw new Error('No hay productos disponibles en este momento')
+        }
+        if (!navigator.onLine) {
+            throw new Error('Sin conexión a internet. Verifica tu red.')
+        }
+
+        throw new Error(`Error al cargar productos: ${error.message}`)
     }
-    // Map database columns to application properties
-    return data.map(p => ({
-        ...p,
-        category: p.categoria,
-        name: p.product_name || 'Sin nombre',
-        price: p.precio_venta_final || 0
-    }))
 }
 
 export async function getExchangeRate() {
-    const { data, error } = await supabase
-        .from('exchange_rates')
-        .select('currency_code, rate_to_ves')
-        .eq('currency_code', 'USD')
-        .single()
+    try {
+        const { data, error } = await supabase
+            .from('exchange_rates')
+            .select('currency_code, rate_to_ves')
+            .eq('currency_code', 'USD')
+            .single()
 
-    if (error) {
+        if (error) throw error
+
+        // Return standardized rate object
+        return { rate: data.rate_to_ves }
+    } catch (error) {
         console.error('Error fetching exchange rate:', error)
-        return null
+
+        if (!navigator.onLine) {
+            throw new Error('Sin conexión para obtener tasa de cambio')
+        }
+
+        // Return default rate as fallback
+        console.warn('Using default exchange rate: 1')
+        return { rate: 1 }
     }
-    // Return standardized rate object
-    return { rate: data.rate_to_ves }
 }
 // Register ATOMIC order in ERP (V3)
 export async function registerOrderV3(items, exchangeRate, metadata = {}) {

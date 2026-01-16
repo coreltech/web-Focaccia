@@ -218,6 +218,12 @@ header {
     opacity: 0.9;
 }
 
+/* Focus state for accessibility */
+.floating-cart:focus {
+    outline: 3px solid #3b82f6;
+    outline-offset: 2px;
+}
+
 /* Remove old cart trigger styles */
 .cart-trigger {
     display: none;
@@ -338,6 +344,7 @@ header {
     margin: 0;
     display: -webkit-box;
     -webkit-line-clamp: 4;
+    line-clamp: 4;
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -388,7 +395,134 @@ header {
     font-size: 0.9rem;
 }
 
-/* ===== SIMPLE CARD (Cafeteria) ===== */
+/* ===== BEVERAGE CARD (Cafeteria) ===== */
+.beverage-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: linear-gradient(135deg, #ffffff 0%, #fdfaf5 100%);
+    border: 1px solid rgba(194, 124, 62, 0.15);
+    border-radius: 1rem;
+    padding: 1.2rem;
+    margin-bottom: 0.8rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(45, 36, 30, 0.04);
+}
+
+.beverage-card:hover {
+    background: white;
+    box-shadow: 0 4px 16px rgba(194, 124, 62, 0.12);
+    transform: translateY(-2px);
+    border-color: rgba(194, 124, 62, 0.25);
+}
+
+.beverage-card.out-of-stock {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.beverage-card.out-of-stock:hover {
+    transform: none;
+    box-shadow: 0 2px 8px rgba(45, 36, 30, 0.04);
+}
+
+.beverage-icon {
+    font-size: 2.5rem;
+    line-height: 1;
+    min-width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(194, 124, 62, 0.08) 0%, rgba(194, 124, 62, 0.02) 100%);
+    border-radius: 12px;
+    flex-shrink: 0;
+}
+
+.beverage-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.beverage-name {
+    font-size: 1.1rem;
+    color: var(--text-main);
+    margin: 0 0 0.4rem 0;
+    font-weight: 600;
+    font-family: var(--font-title);
+}
+
+.beverage-prices {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.price-usd {
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.price-divider {
+    color: var(--text-muted);
+    opacity: 0.5;
+}
+
+.price-ves {
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.out-badge {
+    display: inline-block;
+    background: #ff4d4d;
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.3rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 0.3rem;
+}
+
+.beverage-add-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: none;
+    background: var(--primary);
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(194, 124, 62, 0.25);
+}
+
+.beverage-add-btn:hover:not(:disabled) {
+    background: #a05a2c;
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(194, 124, 62, 0.35);
+}
+
+.beverage-add-btn:active:not(:disabled) {
+    transform: scale(0.95);
+}
+
+.beverage-add-btn:disabled {
+    background: #e5e0d8;
+    color: #7a6b5d;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* Legacy simple-card (deprecated) */
 .simple-card {
     display: flex;
     justify-content: space-between;
@@ -438,6 +572,26 @@ header {
     cursor: not-allowed;
     transform: none !important;
     box-shadow: none;
+}
+
+/* ===== ADD TO CART ANIMATION ===== */
+@keyframes addToCartPulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 6px 20px rgba(194, 124, 62, 0.4);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.add-btn.adding {
+    animation: addToCartPulse 0.3s ease;
 }
 
 /* ===== STATUS TICKER ===== */
