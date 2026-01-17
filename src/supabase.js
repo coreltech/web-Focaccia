@@ -94,3 +94,24 @@ export async function registerOrderV3(items, exchangeRate, metadata = {}) {
     return { success: true, group_id: data.order_group };
 }
 
+export async function subscribeToNewsletter(email, name) {
+    try {
+        const { error } = await supabase
+            .from('newsletter_subscribers')
+            .insert([{ email, name }])
+
+        if (error) {
+            // Handle unique constraint violation (email already exists)
+            if (error.code === '23505') {
+                return { success: true, alreadySubscribed: true }
+            }
+            throw error
+        }
+
+        return { success: true }
+    } catch (error) {
+        console.error('Error subscribing to newsletter:', error)
+        return { success: false, error: error.message }
+    }
+}
+

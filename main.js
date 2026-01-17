@@ -1,4 +1,4 @@
-import { getProducts, getExchangeRate, registerOrderV3 } from './src/supabase.js'
+﻿import { getProducts, getExchangeRate, registerOrderV3, subscribeToNewsletter } from './src/supabase.js'
 import { CACHE_CONFIG, TOAST_DURATION, ANIMATION_DURATION, WHATSAPP_NUMBER, DEFAULT_IMAGES } from './src/constants.js'
 import { formatPrice, formatExchangeRate } from './src/utils/formatters.js'
 import { validateCheckoutForm, validateCart } from './src/utils/validators.js'
@@ -487,7 +487,7 @@ window.checkout = async () => {
     }
 
     // 2. Prepare WhatsApp Message
-    let message = `*🍕 Nuevo Pedido Focaccia Plus*\n\n`
+    let message = `*🍕 Nuevo Pedido Focaccia & Coffee*\n\n`
     message += `👤 *Cliente:* ${clientName}\n`
     message += `💳 *Pago:* ${paymentMethod}\n`
     message += `📦 *Tipo:* ${orderType === 'delivery' ? '🛵 Delivery' : '📍 Pickup'}\n`
@@ -545,3 +545,66 @@ document.addEventListener('keydown', (e) => {
 })
 
 init()
+
+// Newsletter Subscription Handler
+const newsletterForm = document.getElementById('newsletter-form')
+if (newsletterForm) {
+  newsletterForm.addEventListener('submit', async (e) => {
+    e.preventDefault()
+
+    const emailInput = document.getElementById('newsletter-email')
+    const nameInput = document.getElementById('newsletter-name')
+    const email = emailInput.value.trim()
+    const name = nameInput?.value.trim() || ''
+
+    if (!email || !email.includes('@')) {
+      showToast('Por favor ingresa un email válido', 'warning')
+      return
+    }
+
+    if (!name) {
+      showToast('Por favor dinos tu nombre', 'warning')
+      return
+    }
+
+    const btn = newsletterForm.querySelector('.newsletter-btn')
+    const originalText = btn.innerText
+    btn.disabled = true
+    btn.innerText = 'Suscribiendo...'
+
+    try {
+      // Here you would integrate with your email service (Mailchimp, SendGrid, etc.)
+      // For now, we'll just show a success message and log the email
+      console.log('Newsletter subscription:', { email, name })
+
+      // Call Supabase function
+      const result = await subscribeToNewsletter(email, name)
+
+      if (result.success) {
+        if (result.alreadySubscribed) {
+          showToast(`¡${name}, ya eres parte de nuestra comunidad! 🍞`, 'info')
+        } else {
+          showToast(`¡Gracias por suscribirte, ${name}! 🍞`, 'success')
+        }
+        emailInput.value = ''
+        if (nameInput) nameInput.value = ''
+
+        // Optional: Store in localStorage for now
+        const subscribers = JSON.parse(localStorage.getItem('newsletter_subscribers') || '[]')
+        if (!subscribers.includes(email)) {
+          subscribers.push(email)
+          localStorage.setItem('newsletter_subscribers', JSON.stringify(subscribers))
+        }
+      } else {
+        throw new Error(result.error)
+      }
+
+    } catch (error) {
+      console.error('Newsletter error:', error)
+      showToast('Hubo un error. Intenta de nuevo.', 'error')
+    } finally {
+      btn.disabled = false
+      btn.innerText = originalText
+    }
+  })
+}
